@@ -8,10 +8,16 @@ npm install
 ```
 
 2. Create a `.env` file in the backend directory:
-```
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/computer-shop
-```
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Then edit `.env` and set your MongoDB URI:
+   ```env
+   MONGO_URI=mongodb://localhost:27017/computer-shop
+   ```
+   
+   See `ENV_SETUP.md` for detailed environment variable documentation.
 
 3. Make sure MongoDB is running on your system.
 

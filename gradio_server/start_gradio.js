@@ -13,8 +13,18 @@ const __dirname = dirname(__filename);
 const GRADIO_SCRIPT = join(__dirname, 'app.py');
 const GRADIO_ENABLED = process.env.ENABLE_GRADIO !== 'false'; // Enable by default
 
+// Check if we're on Render (Render doesn't support multiple ports)
+const isRender = !!process.env.RENDER_EXTERNAL_URL || !!process.env.RENDER_URL;
+
 if (!GRADIO_ENABLED) {
   console.log('⚠️  Gradio is disabled (ENABLE_GRADIO=false)');
+  process.exit(0);
+}
+
+if (isRender) {
+  console.log('⚠️  Gradio cannot run on Render (Render does not support multiple ports)');
+  console.log('💡 Gradio is only available in local development');
+  console.log('💡 The backend API is running normally without Gradio');
   process.exit(0);
 }
 
@@ -53,6 +63,11 @@ gradioProcess.stderr?.on('data', (data) => {
     console.error('   cd backend/gradio_server');
     console.error('   pip install -r requirements.txt');
     console.error('💡 The backend will continue running without Gradio.');
+  } else if (errorMsg.includes('Cannot find empty port') || errorMsg.includes('OSError')) {
+    console.error('❌ Port conflict detected!');
+    console.error('💡 This usually happens on Render or when the port is already in use.');
+    console.error('💡 Gradio cannot run on Render (Render only supports one port per service).');
+    console.error('💡 The backend API is running normally without Gradio.');
   }
 });
 

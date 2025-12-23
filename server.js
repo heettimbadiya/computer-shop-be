@@ -8,7 +8,7 @@ import configRequestsRoutes from './routes/configRequests.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
@@ -31,8 +31,11 @@ mongoose
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       
-      // Start Gradio server automatically (if enabled)
-      if (process.env.ENABLE_GRADIO !== 'false') {
+      // Check if we're on Render (Render doesn't support multiple ports)
+      const isRender = !!process.env.RENDER_EXTERNAL_URL || !!process.env.RENDER_URL;
+      
+      // Start Gradio server automatically (if enabled and not on Render)
+      if (process.env.ENABLE_GRADIO !== 'false' && !isRender) {
         // Use setTimeout to start Gradio after backend is fully ready
         setTimeout(() => {
           import('./gradio_server/start_gradio.js')
@@ -45,6 +48,10 @@ mongoose
               console.log('💡 To disable Gradio, set ENABLE_GRADIO=false');
             });
         }, 1000); // Wait 1 second for backend to be fully ready
+      } else if (isRender) {
+        console.log('ℹ️  Gradio is disabled on Render (Render does not support multiple ports)');
+        console.log('💡 Gradio is only available in local development');
+        console.log('💡 To use Gradio, run the backend locally: npm start');
       } else {
         console.log('ℹ️  Gradio is disabled (ENABLE_GRADIO=false)');
       }
