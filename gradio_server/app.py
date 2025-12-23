@@ -236,8 +236,7 @@
 
 """
 Gradio Server for PC Builder - Mobile Optimized
-Experimental implementation for phone usage
-Part of the Backend repository
+Works both locally and on Render
 """
 
 import gradio as gr
@@ -246,177 +245,131 @@ import os
 from typing import Optional
 
 # =========================================================
-# ✅ PORT HANDLING (CRITICAL FOR RENDER)
+# ENV DETECTION
 # =========================================================
-PORT = int(os.environ.get("PORT", 7860))
+IS_RENDER = bool(os.environ.get("RENDER_EXTERNAL_URL"))
 
 # =========================================================
-# ✅ BACKEND API URL HANDLING
+# PORT LOGIC (KEY FIX)
 # =========================================================
-RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
+if IS_RENDER:
+    # Render allows ONLY ONE public port
+    PORT = int(os.environ.get("PORT"))
+else:
+    # Local: keep Gradio separate from Node
+    PORT = 7860
 
-if RENDER_URL:
-    RENDER_URL = RENDER_URL.rstrip("/")
-    BACKEND_API_URL = f"{RENDER_URL}/api"
+# =========================================================
+# BACKEND API URL
+# =========================================================
+if IS_RENDER:
+    BACKEND_API_URL = f"{os.environ['RENDER_EXTERNAL_URL'].rstrip('/')}/api"
 else:
     BACKEND_API_URL = "http://localhost:5000/api"
 
 # =========================================================
-# CONFIG
-# =========================================================
-GRADIO_SHARE = os.getenv("GRADIO_SHARE", "false").lower() == "true"
-
-# =========================================================
-# API HELPERS
+# HELPERS
 # =========================================================
 def get_parts(category: Optional[str] = None):
     try:
         url = f"{BACKEND_API_URL}/parts"
         params = {"category": category} if category else {}
-        response = requests.get(url, params=params, timeout=5)
-        if response.status_code == 200:
-            return response.json().get("data", [])
+        res = requests.get(url, params=params, timeout=5)
+        if res.status_code == 200:
+            return res.json().get("data", [])
         return []
     except Exception as e:
-        print(f"❌ Error fetching parts: {e}")
+        print("❌ API error:", e)
         return []
 
 def format_part_info(parts):
     if not parts:
         return "No parts found."
 
-    result = []
-    for part in parts[:10]:
-        info = f"**{part.get('name', 'Unknown')}**\n"
-        info += f"Category: {part.get('category', 'N/A')}\n"
-        info += f"Price: ${part.get('price', 0):,.2f}\n"
-        info += f"Stock: {part.get('stock', 0)} units\n"
-        if part.get("description"):
-            info += f"Description: {part.get('description')[:100]}...\n"
-        info += "\n---\n"
-        result.append(info)
-
-    return "\n".join(result)
+    out = []
+    for p in parts[:10]:
+        out.append(
+            f"**{p.get('name','Unknown')}**\n"
+            f"Category: {p.get('category','N/A')}\n"
+            f"Price: ${p.get('price',0):,.2f}\n"
+            f"Stock: {p.get('stock',0)}\n\n---\n"
+        )
+    return "\n".join(out)
 
 def search_parts(query: str, category: str):
-    if not query and category == "All":
-        parts = get_parts()
-    else:
-        parts = get_parts(category if category != "All" else None)
-
+    parts = get_parts(category if category != "All" else None)
     if query:
         q = query.lower()
         parts = [
             p for p in parts
-            if q in p.get("name", "").lower()
-            or q in p.get("description", "").lower()
+            if q in p.get("name","").lower()
+            or q in p.get("description","").lower()
         ]
-
     return format_part_info(parts)
 
-def calculate_total(selected_parts: str):
-    if not selected_parts:
-        return "Please select parts first."
+def calculate_total(selected: str):
+    if not selected:
+        return "Select parts first."
 
-    try:
-        part_names = [p.strip() for p in selected_parts.split(",")]
-        all_parts = get_parts()
+    names = [n.strip() for n in selected.split(",")]
+    parts = get_parts()
+    total = 0
+    found = []
 
-        total = 0
-        found = []
+    for p in parts:
+        if p.get("name") in names:
+            price = p.get("price",0)
+            total += price
+            found.append(f"{p['name']}: ${price:,.2f}")
 
-        for part in all_parts:
-            if part.get("name") in part_names:
-                price = part.get("price", 0)
-                total += price
-                found.append(f"{part.get('name')}: ${price:,.2f}")
+    if not found:
+        return "No matching parts."
 
-        if not found:
-            return "No matching parts found."
-
-        return (
-            "**Selected Parts:**\n\n"
-            + "\n".join(found)
-            + f"\n\n**Total Price: ${total:,.2f}**"
-        )
-
-    except Exception as e:
-        return f"❌ Error calculating total: {e}"
-
-# =========================================================
-# 🎨 GRADIO UI
-# =========================================================
-with gr.Blocks(
-    title="PC Builder - Mobile",
-    theme=gr.themes.Soft(primary_hue="purple"),
-    css="""
-    .gradio-container {
-        max-width: 100% !important;
-        padding: 10px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-    @media (max-width: 768px) {
-        input, textarea, select, button {
-            font-size: 16px !important;
-        }
-    }
-    """
-) as demo:
-
-    gr.Markdown(
-        """
-        # 🖥️ PC Builder – Mobile Interface  
-        **Experimental Mobile Version**
-        """
+    return (
+        "**Selected Parts:**\n\n"
+        + "\n".join(found)
+        + f"\n\n**Total: ${total:,.2f}**"
     )
 
-    with gr.Row():
-        search_query = gr.Textbox(
-            label="🔍 Search Parts",
-            placeholder="Enter part name or description"
-        )
-        category_filter = gr.Dropdown(
-            choices=["All", "CPU", "GPU", "RAM", "Storage", "Motherboard", "Power Supply", "Cabinet"],
-            value="All",
-            label="📦 Category"
-        )
+# =========================================================
+# UI
+# =========================================================
+with gr.Blocks(title="PC Builder - Mobile") as demo:
+    gr.Markdown("# 🖥️ PC Builder (Mobile)")
 
-    search_btn = gr.Button("Search", variant="primary")
-
-    results = gr.Markdown(label="Results")
-
-    gr.Markdown("---")
-
-    gr.Markdown("### 💰 Price Calculator")
-
-    selected_parts_input = gr.Textbox(
-        label="Selected Parts (comma-separated)",
-        placeholder="AMD Ryzen 9 5900X, RTX 4080"
+    search = gr.Textbox(label="Search")
+    category = gr.Dropdown(
+        ["All","CPU","GPU","RAM","Storage","Motherboard","Power Supply","Cabinet"],
+        value="All"
     )
 
-    calculate_btn = gr.Button("Calculate Total", variant="primary")
-    total_output = gr.Markdown()
+    btn = gr.Button("Search")
+    results = gr.Markdown()
 
-    # EVENTS
-    search_btn.click(search_parts, [search_query, category_filter], results)
-    search_query.submit(search_parts, [search_query, category_filter], results)
-    category_filter.change(search_parts, [search_query, category_filter], results)
-    calculate_btn.click(calculate_total, selected_parts_input, total_output)
+    gr.Markdown("### 💰 Calculator")
+    selected = gr.Textbox(label="Selected Parts (comma separated)")
+    calc_btn = gr.Button("Calculate")
+    total = gr.Markdown()
+
+    btn.click(search_parts, [search, category], results)
+    search.submit(search_parts, [search, category], results)
+    category.change(search_parts, [search, category], results)
+    calc_btn.click(calculate_total, selected, total)
 
     demo.load(lambda: search_parts("", "All"), outputs=results)
 
 # =========================================================
-# 🚀 SERVER START
+# START SERVER
 # =========================================================
 if __name__ == "__main__":
     print("🚀 Starting Gradio server")
-    print(f"🔌 Binding to PORT: {PORT}")
-    print(f"🔌 Backend API: {BACKEND_API_URL}")
+    print("🌍 Environment:", "Render" if IS_RENDER else "Local")
+    print("🔌 Port:", PORT)
+    print("🔌 Backend API:", BACKEND_API_URL)
 
     demo.launch(
         server_name="0.0.0.0",
         server_port=PORT,
-        share=GRADIO_SHARE,
-        show_error=True,
-        inbrowser=False
+        inbrowser=not IS_RENDER,
+        show_error=True
     )
