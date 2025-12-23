@@ -8,7 +8,7 @@ import configRequestsRoutes from './routes/configRequests.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.NODE_ENV === "production" ? 5001 : 5000;
+const PORT = process.env.PORT
 
 // Middleware
 app.use(cors());
