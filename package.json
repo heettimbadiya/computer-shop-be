@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node scripts/seedParts.js"
+    "seed": "node scripts/seedParts.js",
+    "gradio:install": "cd gradio_server && pip install -r requirements.txt",
+    "gradio": "cd gradio_server && python app.py",
+    "gradio:standalone": "cd gradio_server && python app.py"
   },
   "keywords": [],
   "author": "",
