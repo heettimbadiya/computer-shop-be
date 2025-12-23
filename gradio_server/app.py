@@ -252,12 +252,10 @@ IS_RENDER = bool(os.environ.get("RENDER_EXTERNAL_URL"))
 # =========================================================
 # PORT LOGIC (KEY FIX)
 # =========================================================
-if IS_RENDER:
-    # Render allows ONLY ONE public port
-    PORT = int(os.environ.get("PORT"))
-else:
-    # Local: keep Gradio separate from Node
-    PORT = 7860
+# Always use internal port 7860 - Express will proxy requests
+# This allows Gradio to work on Render through the Express proxy
+GRADIO_INTERNAL_PORT = int(os.getenv('GRADIO_PORT', 7860))
+PORT = GRADIO_INTERNAL_PORT
 
 # =========================================================
 # BACKEND API URL
@@ -364,12 +362,26 @@ with gr.Blocks(title="PC Builder - Mobile") as demo:
 if __name__ == "__main__":
     print("🚀 Starting Gradio server")
     print("🌍 Environment:", "Render" if IS_RENDER else "Local")
-    print("🔌 Port:", PORT)
+    print("🔌 Internal Port:", PORT)
     print("🔌 Backend API:", BACKEND_API_URL)
+    
+    if IS_RENDER:
+        print("✅ Running on Render - accessible via Express proxy at /gradio")
+    else:
+        print("✅ Running locally - accessible at http://localhost:7860")
+        print("✅ Also accessible via Express proxy at http://localhost:5000/gradio")
 
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=PORT,
-        inbrowser=not IS_RENDER,
-        show_error=True
-    )
+    try:
+        demo.launch(
+            server_name="127.0.0.1",  # Bind to localhost only (internal, not exposed)
+            server_port=PORT,
+            inbrowser=False,  # Never open browser automatically
+            show_error=True,
+            share=False,  # Don't create public share link
+            root_path="/gradio",  # Set root path for proxy (works on both Render and local)
+            favicon_path=None
+        )
+    except Exception as e:
+        print(f"❌ Error starting Gradio: {e}")
+        print(f"💡 Make sure port {PORT} is available")
+        raise

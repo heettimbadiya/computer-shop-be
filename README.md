@@ -17,7 +17,9 @@ npm install
    MONGO_URI=mongodb://localhost:27017/computer-shop
    ```
    
-   See `ENV_SETUP.md` for detailed environment variable documentation.
+   **📝 Note**: See `ENV_SETUP.md` for detailed documentation and `ENV_UPDATE_NOTIFICATION.md` for update history.
+   
+   **🔔 Important**: The `.env` file is in `.gitignore` - never commit it!
 
 3. Make sure MongoDB is running on your system.
 

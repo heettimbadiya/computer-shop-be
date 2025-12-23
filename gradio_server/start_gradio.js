@@ -13,20 +13,12 @@ const __dirname = dirname(__filename);
 const GRADIO_SCRIPT = join(__dirname, 'app.py');
 const GRADIO_ENABLED = process.env.ENABLE_GRADIO !== 'false'; // Enable by default
 
-// Check if we're on Render (Render doesn't support multiple ports)
-const isRender = !!process.env.RENDER_EXTERNAL_URL || !!process.env.RENDER_URL;
-
 if (!GRADIO_ENABLED) {
   console.log('⚠️  Gradio is disabled (ENABLE_GRADIO=false)');
   process.exit(0);
 }
 
-if (isRender) {
-  console.log('⚠️  Gradio cannot run on Render (Render does not support multiple ports)');
-  console.log('💡 Gradio is only available in local development');
-  console.log('💡 The backend API is running normally without Gradio');
-  process.exit(0);
-}
+// Note: Gradio now works on Render too! It runs on internal port and is proxied through Express
 
 if (!existsSync(GRADIO_SCRIPT)) {
   console.error('❌ Gradio script not found:', GRADIO_SCRIPT);

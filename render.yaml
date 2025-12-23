@@ -2,7 +2,7 @@ services:
   - type: web
     name: pc-builder-backend
     env: node
-    buildCommand: npm install
+    buildCommand: npm install && pip install -r gradio_server/requirements.txt
     startCommand: npm start
     envVars:
       - key: PORT
