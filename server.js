@@ -29,6 +29,59 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
+// Gradio health check endpoint
+app.get('/api/gradio/health', (req, res) => {
+  if (!GRADIO_ENABLED) {
+    return res.json({ 
+      status: 'disabled', 
+      message: 'Gradio is disabled',
+      enabled: false 
+    });
+  }
+  
+  // Try to check if Gradio is running
+  const http = require('http');
+  const options = {
+    hostname: 'localhost',
+    port: GRADIO_INTERNAL_PORT,
+    path: '/gradio', // Use /gradio path since Gradio's root_path expects it
+    method: 'GET',
+    timeout: 2000
+  };
+  
+  const gradioReq = http.request(options, (gradioRes) => {
+    res.json({ 
+      status: 'running', 
+      message: 'Gradio is running',
+      enabled: true,
+      port: GRADIO_INTERNAL_PORT,
+      url: '/gradio'
+    });
+  });
+  
+  gradioReq.on('error', (err) => {
+    res.json({ 
+      status: 'not_running', 
+      message: 'Gradio is not running yet',
+      enabled: true,
+      error: err.message,
+      suggestion: 'Gradio may still be starting up. Please wait a moment and refresh.'
+    });
+  });
+  
+  gradioReq.on('timeout', () => {
+    gradioReq.destroy();
+    res.json({ 
+      status: 'timeout', 
+      message: 'Gradio is not responding',
+      enabled: true,
+      suggestion: 'Gradio may still be starting up. Please wait a moment and refresh.'
+    });
+  });
+  
+  gradioReq.end();
+});
+
 // Gradio Proxy Route (works on Render!)
 // This allows Gradio to be accessed through the same port as the backend
 if (GRADIO_ENABLED) {
@@ -36,13 +89,15 @@ if (GRADIO_ENABLED) {
   app.use('/gradio', createProxyMiddleware({
     target: `http://localhost:${GRADIO_INTERNAL_PORT}`,
     changeOrigin: true,
+    // Keep /gradio prefix - Gradio's root_path="/gradio" expects it
     pathRewrite: {
-      '^/gradio': '', // Remove /gradio prefix when forwarding
+      '^/gradio': '/gradio', // Keep /gradio prefix for Gradio's root_path
     },
     ws: true, // Enable websocket support for Gradio
     logLevel: 'silent',
     timeout: 30000, // 30 second timeout
     proxyTimeout: 30000,
+    followRedirects: true,
     onError: (err, req, res) => {
       // Only log if it's not a connection error (Gradio might still be starting)
       if (err.code !== 'ECONNREFUSED') {
@@ -59,6 +114,15 @@ if (GRADIO_ENABLED) {
     onProxyReq: (proxyReq, req, res) => {
       // Add CORS headers for Gradio
       proxyReq.setHeader('Access-Control-Allow-Origin', '*');
+      proxyReq.setHeader('X-Forwarded-Proto', req.protocol);
+      proxyReq.setHeader('X-Forwarded-Host', req.get('host'));
+      proxyReq.setHeader('X-Forwarded-Prefix', '/gradio');
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      // Add CORS headers to response
+      proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+      proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+      proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
     }
   }));
   
