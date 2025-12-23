@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import http from 'http';
 import partsRoutes from './routes/parts.js';
 import configRequestsRoutes from './routes/configRequests.js';
 
@@ -39,8 +40,17 @@ app.get('/api/gradio/health', (req, res) => {
     });
   }
   
+  // Flag to ensure we only send one response
+  let responseSent = false;
+  
+  const sendResponse = (data) => {
+    if (!responseSent) {
+      responseSent = true;
+      res.json(data);
+    }
+  };
+  
   // Try to check if Gradio is running
-  const http = require('http');
   const options = {
     hostname: 'localhost',
     port: GRADIO_INTERNAL_PORT,
@@ -50,17 +60,28 @@ app.get('/api/gradio/health', (req, res) => {
   };
   
   const gradioReq = http.request(options, (gradioRes) => {
-    res.json({ 
-      status: 'running', 
-      message: 'Gradio is running',
-      enabled: true,
-      port: GRADIO_INTERNAL_PORT,
-      url: '/gradio'
-    });
+    // Check status code
+    if (gradioRes.statusCode >= 200 && gradioRes.statusCode < 300) {
+      sendResponse({ 
+        status: 'running', 
+        message: 'Gradio is running',
+        enabled: true,
+        port: GRADIO_INTERNAL_PORT,
+        url: '/gradio'
+      });
+    } else {
+      sendResponse({ 
+        status: 'not_running', 
+        message: 'Gradio is not responding correctly',
+        enabled: true,
+        error: `HTTP ${gradioRes.statusCode}`,
+        suggestion: 'Gradio may still be starting up. Please wait a moment and refresh.'
+      });
+    }
   });
   
   gradioReq.on('error', (err) => {
-    res.json({ 
+    sendResponse({ 
       status: 'not_running', 
       message: 'Gradio is not running yet',
       enabled: true,
@@ -70,15 +91,18 @@ app.get('/api/gradio/health', (req, res) => {
   });
   
   gradioReq.on('timeout', () => {
-    gradioReq.destroy();
-    res.json({ 
-      status: 'timeout', 
-      message: 'Gradio is not responding',
-      enabled: true,
-      suggestion: 'Gradio may still be starting up. Please wait a moment and refresh.'
-    });
+    if (!responseSent) {
+      gradioReq.destroy();
+      sendResponse({ 
+        status: 'timeout', 
+        message: 'Gradio is not responding',
+        enabled: true,
+        suggestion: 'Gradio may still be starting up. Please wait a moment and refresh.'
+      });
+    }
   });
   
+  gradioReq.setTimeout(2000);
   gradioReq.end();
 });
 
