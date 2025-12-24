@@ -22,6 +22,10 @@ const partSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  isSecondHand: {
+    type: Boolean,
+    default: false,
+  },
   // Compatibility rules
   compatibility: {
     // For CPU: socket type (e.g., "AM4", "LGA1700")
