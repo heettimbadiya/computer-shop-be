@@ -77,16 +77,15 @@ export const validateCompatibility = (selectedParts, allParts) => {
 
 export const getCompatibleParts = (category, selectedParts, allParts) => {
   if (!selectedParts || Object.keys(selectedParts).length === 0) {
-    // If no parts selected, return all parts in this category (excluding second-hand)
+    // If no parts selected, return all parts in this category (including second-hand)
+    // Show all items regardless of stock (stock check will be done in frontend for selection)
     return allParts.filter(part => 
-      part.category === category && 
-      part.stock > 0 && 
-      !part.isSecondHand
+      part.category === category
     );
   }
 
   const compatibleParts = allParts.filter(part => {
-    if (part.category !== category || part.stock <= 0 || part.isSecondHand) {
+    if (part.category !== category) {
       return false;
     }
 

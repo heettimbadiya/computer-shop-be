@@ -4,18 +4,14 @@ import { getCompatibleParts } from '../services/compatibilityService.js';
 // Get all parts with optional filters
 export const getAllParts = async (req, res) => {
   try {
-    const { category, compatibleWith, includeSecondHand } = req.query;
+    const { category, compatibleWith } = req.query;
     let query = {};
 
     if (category) {
       query.category = category;
     }
 
-    // Exclude second-hand parts by default (unless explicitly included for admin)
-    if (includeSecondHand !== 'true') {
-      query.isSecondHand = { $ne: true };
-    }
-
+    // Show all parts (both new and second-hand) - deleted items are automatically excluded by MongoDB
     const allParts = await Part.find(query).sort({ category: 1, name: 1 });
 
     // If compatibleWith is provided, filter compatible parts
@@ -57,10 +53,8 @@ export const getAllParts = async (req, res) => {
 // Get single part by ID
 export const getPartById = async (req, res) => {
   try {
-    const part = await Part.findOne({ 
-      _id: req.params.id,
-      isSecondHand: { $ne: true } // Exclude second-hand parts
-    });
+    // Show all parts (both new and second-hand) - deleted items are automatically excluded
+    const part = await Part.findById(req.params.id);
     if (!part) {
       return res.status(404).json({
         success: false,
