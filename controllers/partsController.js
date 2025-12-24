@@ -77,6 +77,33 @@ export const getPartById = async (req, res) => {
 // Create new part (admin)
 export const createPart = async (req, res) => {
   try {
+    // Validate required fields
+    const { name, category, price, stock } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Part name is required',
+      });
+    }
+    if (!category) {
+      return res.status(400).json({
+        success: false,
+        message: 'Part category is required',
+      });
+    }
+    if (price === undefined || price === null || price < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid price is required',
+      });
+    }
+    if (stock === undefined || stock === null || stock < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid stock quantity is required',
+      });
+    }
+
     const part = new Part(req.body);
     await part.save();
     res.status(201).json({
