@@ -6,6 +6,7 @@ import partsRoutes from './routes/parts.js';
 import configRequestsRoutes from './routes/configRequests.js';
 import contactInfoRoutes from './routes/contactInfo.js';
 import settingsRoutes from './routes/settings.js';
+import categoriesRoutes from './routes/categories.js';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use('/api/parts', partsRoutes);
 app.use('/api/config-requests', configRequestsRoutes);
 app.use('/api/contact-info', contactInfoRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/categories', categoriesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

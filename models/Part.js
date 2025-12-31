@@ -9,7 +9,6 @@ const partSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ['CPU', 'Motherboard', 'RAM', 'Storage', 'GPU', 'Power Supply', 'Cabinet'],
   },
   price: {
     type: Number,
@@ -84,6 +83,50 @@ const partSchema = new mongoose.Schema({
   },
 }, {
   timestamps: true,
+});
+
+// Pre-save hook to validate category exists
+partSchema.pre('save', async function(next) {
+  if (this.isModified('category') || this.isNew) {
+    try {
+      const Category = mongoose.model('Category');
+      const category = await Category.findOne({ name: this.category });
+      if (!category) {
+        return next(new Error(`Category "${this.category}" does not exist. Please create the category first.`));
+      }
+    } catch (error) {
+      return next(error);
+    }
+  }
+  next();
+});
+
+// Pre-update hook for findOneAndUpdate, findByIdAndUpdate, etc.
+partSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], async function(next) {
+  const update = this.getUpdate();
+  let categoryValue = null;
+  
+  if (update) {
+    // Handle both direct updates and $set operator
+    if (update.category) {
+      categoryValue = update.category;
+    } else if (update.$set && update.$set.category) {
+      categoryValue = update.$set.category;
+    }
+  }
+  
+  if (categoryValue) {
+    try {
+      const Category = mongoose.model('Category');
+      const category = await Category.findOne({ name: categoryValue });
+      if (!category) {
+        return next(new Error(`Category "${categoryValue}" does not exist. Please create the category first.`));
+      }
+    } catch (error) {
+      return next(error);
+    }
+  }
+  next();
 });
 
 export default mongoose.model('Part', partSchema);
